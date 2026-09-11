@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard Risk Management",
+  "description": "Enterprise Risk Management (ERM) Dashboard dengan Heat Matrix 5x5 ISO 31000, Risk Register, Key Risk Indicators (KRI), dan Pelacakan Mitigasi Risiko.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
