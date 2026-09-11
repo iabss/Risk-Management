@@ -15,15 +15,19 @@ import {
   Sparkles,
   Layers,
   Plus,
+  CheckSquare,
 } from 'lucide-react';
 import { RiskItem, RiskLevel } from '../types/risk';
 import { getRiskLevelConfig, getStatusConfig } from '../utils/riskCalculations';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface RiskRegisterTableProps {
   risks: RiskItem[];
   onViewRisk: (risk: RiskItem) => void;
   onEditRisk: (risk: RiskItem) => void;
   onDeleteRisk: (id: string) => void;
+  onDeleteMultipleRisks?: (ids: string[]) => void;
+  onClearAllRisks?: () => void;
   onOpenAddRisk?: () => void;
   selectedCategory: string;
   onSelectCategory: (cat: string) => void;
@@ -43,6 +47,8 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
   onViewRisk,
   onEditRisk,
   onDeleteRisk,
+  onDeleteMultipleRisks,
+  onClearAllRisks,
   onOpenAddRisk,
   selectedCategory,
   onSelectCategory,
@@ -58,6 +64,10 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
 }) => {
   const [sortField, setSortField] = useState<'inherentScore' | 'residualScore' | 'code' | 'progress'>('inherentScore');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const [selectedRiskIds, setSelectedRiskIds] = useState<string[]>([]);
+  const [deleteTargetRisk, setDeleteTargetRisk] = useState<RiskItem | null>(null);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState<boolean>(false);
 
   // Departments list for dropdown
   const departments = Array.from(new Set(risks.map((r) => r.department)));
@@ -136,13 +146,23 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
       <div className="p-4 sm:p-5 border-b border-white/5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center space-x-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="text-lg font-serif text-white">
                 Daftar Profil Risiko (Risk Register)
               </h2>
               <span className="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-sm bg-white/5 text-white/50 border border-white/10">
                 {sortedRisks.length} dari {risks.length} Risiko
               </span>
+              {risks.length > 0 && (
+                <button
+                  onClick={() => setIsClearAllModalOpen(true)}
+                  className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 text-[11px] font-medium text-white/40 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 rounded-sm transition"
+                  title="Kosongkan seluruh daftar profil risiko"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Kosongkan Semua</span>
+                </button>
+              )}
             </div>
             <p className="text-xs text-white/40 mt-1">
               Identifikasi risiko komprehensif, evaluasi dampak, status mitigasi, dan risiko residual.
@@ -274,11 +294,57 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
         </div>
       </div>
 
+      {/* Bulk Selection Action Bar */}
+      {selectedRiskIds.length > 0 && (
+        <div className="bg-red-950/40 border-b border-red-900/40 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 animate-fade-in text-xs">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="font-mono text-white font-medium">
+              {selectedRiskIds.length} profil risiko dipilih
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedRiskIds([])}
+              className="text-[11px] text-white/50 hover:text-white underline ml-1 cursor-pointer"
+            >
+              Batalkan Pilihan
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-sm bg-red-600 hover:bg-red-500 text-white font-medium text-xs transition border border-red-500/50 shadow-sm active:scale-95 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus {selectedRiskIds.length} Risiko Terpilih</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table Content */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-white/70 border-collapse">
           <thead className="bg-[#0F0F12] text-[10px] uppercase font-mono tracking-widest text-white/40 border-b border-white/5">
             <tr>
+              <th className="py-3 px-3 w-10 text-center">
+                <input
+                  type="checkbox"
+                  aria-label="Pilih semua risiko di tabel"
+                  checked={sortedRisks.length > 0 && sortedRisks.every((r) => selectedRiskIds.includes(r.id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const allVisibleIds = sortedRisks.map((r) => r.id);
+                      setSelectedRiskIds(Array.from(new Set([...selectedRiskIds, ...allVisibleIds])));
+                    } else {
+                      const visibleIdSet = new Set(sortedRisks.map((r) => r.id));
+                      setSelectedRiskIds(selectedRiskIds.filter((id) => !visibleIdSet.has(id)));
+                    }
+                  }}
+                  className="rounded-sm accent-red-500 bg-[#0F0F12] border-white/20 cursor-pointer w-3.5 h-3.5 align-middle"
+                />
+              </th>
               <th className="py-3 px-4 font-medium">
                 <button
                   onClick={() => handleSort('code')}
@@ -323,7 +389,7 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
           <tbody className="divide-y divide-white/5">
             {risks.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-white/40">
+                <td colSpan={8} className="py-16 text-center text-white/40">
                   <div className="flex flex-col items-center justify-center space-y-3 max-w-sm mx-auto">
                     <div className="w-12 h-12 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
                       <Layers className="w-6 h-6" />
@@ -348,7 +414,7 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
               </tr>
             ) : sortedRisks.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-white/40">
+                <td colSpan={8} className="py-12 text-center text-white/40">
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <AlertCircle className="w-7 h-7 text-white/20" />
                     <p className="text-xs">Tidak ada risiko yang sesuai dengan kriteria filter.</p>
@@ -371,8 +437,28 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
                   <tr
                     key={risk.id}
                     id={`risk-row-${risk.code}`}
-                    className="hover:bg-white/[0.02] transition group"
+                    className={`hover:bg-white/[0.02] transition group ${
+                      selectedRiskIds.includes(risk.id) ? 'bg-red-950/10' : ''
+                    }`}
                   >
+                    {/* Selection Checkbox */}
+                    <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Pilih profil risiko ${risk.code}`}
+                        checked={selectedRiskIds.includes(risk.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) {
+                            setSelectedRiskIds((prev) => [...prev, risk.id]);
+                          } else {
+                            setSelectedRiskIds((prev) => prev.filter((id) => id !== risk.id));
+                          }
+                        }}
+                        className="rounded-sm accent-red-500 bg-[#0F0F12] border-white/20 cursor-pointer w-3.5 h-3.5 align-middle"
+                      />
+                    </td>
+
                     {/* Code & Title */}
                     <td className="py-3.5 px-4 max-w-xs">
                       <div className="flex items-center space-x-2">
@@ -500,13 +586,10 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Hapus risiko ${risk.code} - ${risk.title}?`)) {
-                              onDeleteRisk(risk.id);
-                            }
-                          }}
-                          className="p-1.5 rounded-sm text-white/40 hover:text-red-400 hover:bg-white/5 transition"
-                          title="Hapus Risiko"
+                          type="button"
+                          onClick={() => setDeleteTargetRisk(risk)}
+                          className="p-1.5 rounded-sm text-white/40 hover:text-red-400 hover:bg-red-950/30 transition"
+                          title="Hapus Profil Risiko"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -519,6 +602,74 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Confirmation Modal for Single Risk Delete */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetRisk)}
+        onClose={() => setDeleteTargetRisk(null)}
+        onConfirm={() => {
+          if (deleteTargetRisk) {
+            onDeleteRisk(deleteTargetRisk.id);
+            setSelectedRiskIds((prev) => prev.filter((id) => id !== deleteTargetRisk.id));
+            setDeleteTargetRisk(null);
+          }
+        }}
+        title="Hapus Profil Risiko"
+        message="Apakah Anda yakin ingin menghapus profil risiko ini? Data profil risiko dan rencana tindakan mitigasinya akan dihapus dari Risk Register."
+        itemDetails={
+          deleteTargetRisk
+            ? {
+                code: deleteTargetRisk.code,
+                title: deleteTargetRisk.title,
+                category: deleteTargetRisk.category,
+                department: deleteTargetRisk.department,
+              }
+            : undefined
+        }
+        confirmButtonText="Ya, Hapus Profil Risiko"
+      />
+
+      {/* Confirmation Modal for Bulk Delete */}
+      <ConfirmDeleteModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={() => {
+          if (onDeleteMultipleRisks) {
+            onDeleteMultipleRisks(selectedRiskIds);
+          } else {
+            selectedRiskIds.forEach((id) => onDeleteRisk(id));
+          }
+          setSelectedRiskIds([]);
+          setIsBulkDeleteModalOpen(false);
+        }}
+        title="Hapus Profil Risiko Terpilih"
+        message={`Apakah Anda yakin ingin menghapus ${selectedRiskIds.length} profil risiko terpilih secara bersamaan? Tindakan ini tidak dapat dibatalkan.`}
+        itemDetails={{
+          count: selectedRiskIds.length,
+        }}
+        confirmButtonText={`Hapus ${selectedRiskIds.length} Risiko`}
+      />
+
+      {/* Confirmation Modal for Clear All Risks */}
+      <ConfirmDeleteModal
+        isOpen={isClearAllModalOpen}
+        onClose={() => setIsClearAllModalOpen(false)}
+        onConfirm={() => {
+          if (onClearAllRisks) {
+            onClearAllRisks();
+          } else {
+            risks.forEach((r) => onDeleteRisk(r.id));
+          }
+          setSelectedRiskIds([]);
+          setIsClearAllModalOpen(false);
+        }}
+        title="Kosongkan Seluruh Profil Risiko"
+        message="Apakah Anda yakin ingin menghapus seluruh daftar profil risiko yang ada saat ini? Semua data profil risiko dan rencana tindakan mitigasi akan dibersihkan untuk memulai daftar baru."
+        itemDetails={{
+          count: risks.length,
+        }}
+        confirmButtonText="Kosongkan Semua Risiko"
+      />
     </div>
   );
 };

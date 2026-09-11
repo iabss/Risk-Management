@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   ShieldAlert,
@@ -13,6 +13,7 @@ import {
   Circle,
   Clock,
   Edit2,
+  Trash2,
   AlertTriangle,
   Layers,
 } from 'lucide-react';
@@ -23,11 +24,13 @@ import {
   getRiskLevelConfig,
   getStatusConfig,
 } from '../utils/riskCalculations';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface RiskDetailModalProps {
   risk: RiskItem | null;
   onClose: () => void;
   onEdit: (risk: RiskItem) => void;
+  onDelete?: (riskId: string) => void;
   onToggleActionItem: (riskId: string, actionId: string) => void;
 }
 
@@ -35,8 +38,11 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
   risk,
   onClose,
   onEdit,
+  onDelete,
   onToggleActionItem,
 }) => {
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
   if (!risk) return null;
 
   const inherentCfg = getRiskLevelConfig(risk.inherentLevel);
@@ -72,7 +78,7 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5">
             <button
               onClick={() => onEdit(risk)}
               className="p-2 rounded-sm text-white/40 hover:text-white hover:bg-white/5 transition"
@@ -80,6 +86,15 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
             >
               <Edit2 className="w-4 h-4" />
             </button>
+            {onDelete && (
+              <button
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                className="p-2 rounded-sm text-white/40 hover:text-red-400 hover:bg-red-950/30 transition"
+                title="Hapus Profil Risiko Ini"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-2 rounded-sm text-white/40 hover:text-white hover:bg-white/5 transition"
@@ -305,18 +320,51 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-white/5 bg-[#0F0F12] flex items-center justify-between">
+        <div className="p-4 border-t border-white/5 bg-[#0F0F12] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-[11px] font-mono text-white/40">
             Peninjauan Terakhir: <b className="text-white/70">{risk.lastReviewDate}</b> • Target Penyelesaian: <b className="text-white/70">{risk.targetDate}</b>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 text-xs font-medium bg-[#1F1F24] text-white rounded-sm border border-white/15 hover:bg-[#282830] transition"
-          >
-            Tutup
-          </button>
+          <div className="flex items-center space-x-2">
+            {onDelete && (
+              <button
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                className="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-sm border border-red-900/40 transition flex items-center space-x-1.5"
+                title="Hapus Profil Risiko Ini"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus Risiko</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 text-xs font-medium bg-[#1F1F24] text-white rounded-sm border border-white/15 hover:bg-[#282830] transition"
+            >
+              Tutup
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Delete */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmDeleteOpen}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          if (onDelete) {
+            onDelete(risk.id);
+          }
+          onClose();
+        }}
+        title="Hapus Profil Risiko"
+        message="Apakah Anda yakin ingin menghapus profil risiko ini secara permanen dari Risk Register?"
+        itemDetails={{
+          code: risk.code,
+          title: risk.title,
+          category: risk.category,
+          department: risk.department,
+        }}
+        confirmButtonText="Ya, Hapus Profil Risiko"
+      />
     </div>
   );
 };

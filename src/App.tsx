@@ -8,6 +8,7 @@ import { RiskRegisterTable } from './components/RiskRegisterTable';
 import { RiskDetailModal } from './components/RiskDetailModal';
 import { RiskFormModal } from './components/RiskFormModal';
 import { ActionTrackerModal } from './components/ActionTrackerModal';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { INITIAL_RISKS, INITIAL_KRIS } from './data/mockRisks';
 import { RiskItem, KRIItem } from './types/risk';
 import { calculateRiskLevel } from './utils/riskCalculations';
@@ -70,6 +71,7 @@ export default function App() {
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isActionTrackerOpen, setIsActionTrackerOpen] = useState<boolean>(false);
+  const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState<boolean>(false);
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -111,6 +113,28 @@ export default function App() {
     setRisks((prev) => prev.filter((r) => r.id !== id));
     if (viewingRisk?.id === id) setViewingRisk(null);
     showToast(`Risiko ${target?.code || ''} berhasil dihapus.`);
+  };
+
+  const handleDeleteMultipleRisks = (ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    setRisks((prev) => prev.filter((r) => !idSet.has(r.id)));
+    if (viewingRisk && idSet.has(viewingRisk.id)) setViewingRisk(null);
+    showToast(`${ids.length} profil risiko berhasil dihapus.`);
+  };
+
+  const handleConfirmResetData = () => {
+    localStorage.removeItem(STORAGE_KEY_RISKS);
+    setRisks([]);
+    setSelectedCell(null);
+    setSelectedCategory('');
+    setSelectedLevel('');
+    setSelectedDepartment('');
+    setSelectedStatus('');
+    setSearchQuery('');
+    if (viewingRisk) setViewingRisk(null);
+    setIsResetConfirmModalOpen(false);
+    showToast('Seluruh daftar risiko berhasil dikosongkan.');
   };
 
   const handleSaveRisk = (riskData: Omit<RiskItem, 'id'>, existingId?: string) => {
@@ -167,18 +191,8 @@ export default function App() {
     );
   };
 
-  const handleResetData = () => {
-    if (window.confirm('Kosongkan seluruh daftar risiko untuk membuat profil baru dari awal?')) {
-      localStorage.removeItem(STORAGE_KEY_RISKS);
-      setRisks([]);
-      setSelectedCell(null);
-      setSelectedCategory('');
-      setSelectedLevel('');
-      setSelectedDepartment('');
-      setSelectedStatus('');
-      setSearchQuery('');
-      showToast('Seluruh daftar risiko berhasil dikosongkan.');
-    }
+  const handleOpenResetModal = () => {
+    setIsResetConfirmModalOpen(true);
   };
 
   const handleClearFilters = () => {
@@ -284,7 +298,7 @@ export default function App() {
         onOpenAddModal={handleOpenAdd}
         onOpenActionTracker={() => setIsActionTrackerOpen(true)}
         onExportData={handleExportData}
-        onResetData={handleResetData}
+        onResetData={handleOpenResetModal}
         selectedQuarter={selectedQuarter}
         onSelectQuarter={setSelectedQuarter}
         totalRisks={risks.length}
@@ -339,6 +353,8 @@ export default function App() {
             onViewRisk={(risk) => setViewingRisk(risk)}
             onEditRisk={(risk) => handleEditRisk(risk)}
             onDeleteRisk={handleDeleteRisk}
+            onDeleteMultipleRisks={handleDeleteMultipleRisks}
+            onClearAllRisks={handleOpenResetModal}
             onOpenAddRisk={handleOpenAdd}
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
@@ -373,6 +389,7 @@ export default function App() {
           risk={viewingRisk}
           onClose={() => setViewingRisk(null)}
           onEdit={(r) => handleEditRisk(r)}
+          onDelete={handleDeleteRisk}
           onToggleActionItem={handleToggleActionItem}
         />
       )}
@@ -396,6 +413,19 @@ export default function App() {
         risks={risks}
         onToggleActionItem={handleToggleActionItem}
         onSelectRisk={(r) => setViewingRisk(r)}
+      />
+
+      {/* Reset / Clear All Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isResetConfirmModalOpen}
+        onClose={() => setIsResetConfirmModalOpen(false)}
+        onConfirm={handleConfirmResetData}
+        title="Kosongkan Seluruh Profil Risiko"
+        message="Apakah Anda yakin ingin menghapus seluruh daftar profil risiko yang ada saat ini? Semua data profil risiko dan rencana tindakan mitigasi akan dibersihkan untuk memulai pendaftaran baru."
+        itemDetails={{
+          count: risks.length,
+        }}
+        confirmButtonText="Kosongkan Semua Risiko"
       />
     </div>
   );
