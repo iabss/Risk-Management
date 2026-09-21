@@ -26,8 +26,6 @@ export const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({
   onToggleActionItem,
   onSelectRisk,
 }) => {
-  if (!isOpen) return null;
-
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Completed'>('All');
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
@@ -66,6 +64,8 @@ export const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({
     if (selectedAssignee && a.assignee !== selectedAssignee) return false;
     return true;
   });
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">

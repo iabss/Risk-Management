@@ -16,8 +16,13 @@ import {
   Layers,
   Plus,
   CheckSquare,
+  MapPin,
+  FileText,
+  FileSpreadsheet,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
-import { RiskItem, RiskLevel } from '../types/risk';
+import { RiskItem, RiskLevel, SITE_OPTIONS } from '../types/risk';
 import { getRiskLevelConfig, getStatusConfig } from '../utils/riskCalculations';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
@@ -29,6 +34,12 @@ interface RiskRegisterTableProps {
   onDeleteMultipleRisks?: (ids: string[]) => void;
   onClearAllRisks?: () => void;
   onOpenAddRisk?: () => void;
+  syncedRiskIds?: Set<string>;
+  onOpenGoogleSheetsSync?: () => void;
+  onQuickRefreshSheets?: () => void;
+  isSyncingSheets?: boolean;
+  selectedSite?: string;
+  onSelectSite?: (site: string) => void;
   selectedCategory: string;
   onSelectCategory: (cat: string) => void;
   selectedLevel: string;
@@ -50,6 +61,12 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
   onDeleteMultipleRisks,
   onClearAllRisks,
   onOpenAddRisk,
+  syncedRiskIds = new Set(),
+  onOpenGoogleSheetsSync,
+  onQuickRefreshSheets,
+  isSyncingSheets = false,
+  selectedSite = '',
+  onSelectSite,
   selectedCategory,
   onSelectCategory,
   selectedLevel,
@@ -69,7 +86,10 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState<boolean>(false);
 
-  // Departments list for dropdown
+  // Lists for dropdown
+  const availableSites = Array.from(
+    new Set([...SITE_OPTIONS, ...(risks.map((r) => r.site).filter(Boolean) as string[])])
+  );
   const departments = Array.from(new Set(risks.map((r) => r.department)));
   const categories = Array.from(new Set(risks.map((r) => r.category)));
 
@@ -81,8 +101,15 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
       !r.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !r.code.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !r.owner.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !r.department.toLowerCase().includes(searchQuery.toLowerCase())
+      !r.department.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !(r.site && r.site.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      !(r.inherentWorstCaseScenario && r.inherentWorstCaseScenario.toLowerCase().includes(searchQuery.toLowerCase()))
     ) {
+      return false;
+    }
+
+    // Site filter
+    if (selectedSite && r.site !== selectedSite) {
       return false;
     }
 
@@ -135,6 +162,7 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
 
   const hasActiveFilters =
     Boolean(searchQuery) ||
+    Boolean(selectedSite) ||
     Boolean(selectedCategory) ||
     Boolean(selectedLevel) ||
     Boolean(selectedDepartment) ||
@@ -153,6 +181,17 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
               <span className="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-sm bg-white/5 text-white/50 border border-white/10">
                 {sortedRisks.length} dari {risks.length} Risiko
               </span>
+              {onOpenGoogleSheetsSync && (
+                <button
+                  type="button"
+                  onClick={onOpenGoogleSheetsSync}
+                  className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 text-[11px] font-medium text-emerald-400 hover:text-white bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/50 rounded-sm transition cursor-pointer"
+                  title="Kelola backup otomatis Google Spreadsheet"
+                >
+                  <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                  <span>Google Sheets Sync</span>
+                </button>
+              )}
               {risks.length > 0 && (
                 <button
                   onClick={() => setIsClearAllModalOpen(true)}
@@ -237,6 +276,21 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#0F0F12] border border-white/10 rounded-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 transition"
             />
           </div>
+
+          {/* Site Filter */}
+          <select
+            aria-label="Filter Site"
+            value={selectedSite}
+            onChange={(e) => onSelectSite && onSelectSite(e.target.value)}
+            className="text-xs bg-[#0F0F12] border border-white/10 rounded-sm px-2.5 py-1.5 text-white/70 focus:outline-none focus:border-white/30 cursor-pointer"
+          >
+            <option value="" className="bg-[#16161A] text-white">Semua Site</option>
+            {availableSites.map((st) => (
+              <option key={st} value={st} className="bg-[#16161A] text-white">
+                Site: {st}
+              </option>
+            ))}
+          </select>
 
           {/* Department Filter */}
           <select
@@ -461,13 +515,36 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
 
                     {/* Code & Title */}
                     <td className="py-3.5 px-4 max-w-xs">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                         <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-white/5 text-white/70 border border-white/10">
                           {risk.code}
                         </span>
+                        {risk.site && (
+                          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-mono font-bold text-red-300 bg-red-950/40 border border-red-800/40 flex items-center">
+                            <MapPin className="w-2.5 h-2.5 mr-0.5" />
+                            {risk.site}
+                          </span>
+                        )}
                         <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-sm font-mono text-white/40 bg-white/5 border border-white/5">
                           {risk.category}
                         </span>
+                        {syncedRiskIds.has(risk.id) ? (
+                          <span
+                            title="Tersinkronisasi ke Google Spreadsheet Backup"
+                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 inline-flex items-center"
+                          >
+                            <FileSpreadsheet className="w-2.5 h-2.5 mr-1 text-emerald-400" />
+                            Synced
+                          </span>
+                        ) : (
+                          <span
+                            title="Belum ter-backup ke Google Sheet. Klik Refresh untuk menyinkronkan."
+                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-mono text-amber-300 bg-amber-950/40 border border-amber-800/40 inline-flex items-center"
+                          >
+                            <Clock className="w-2.5 h-2.5 mr-1 text-amber-400" />
+                            Pending Sync
+                          </span>
+                        )}
                       </div>
                       <div
                         onClick={() => onViewRisk(risk)}
@@ -507,6 +584,15 @@ export const RiskRegisterTable: React.FC<RiskRegisterTableProps> = ({
                         <span className="text-[9px] uppercase font-mono tracking-widest text-white/40 mt-1">
                           {inherentCfg.idLabel}
                         </span>
+                        {risk.inherentWorstCaseScenario && (
+                          <span
+                            className="text-[9px] text-red-400/80 hover:text-red-300 mt-1 block max-w-[125px] truncate cursor-help flex items-center"
+                            title={`Catatan / Skenario Terburuk Inherent: ${risk.inherentWorstCaseScenario}`}
+                          >
+                            <FileText className="w-2.5 h-2.5 mr-0.5 shrink-0" />
+                            Skenario Terburuk
+                          </span>
+                        )}
                       </div>
                     </td>
 

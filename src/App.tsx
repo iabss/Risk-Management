@@ -9,12 +9,21 @@ import { RiskDetailModal } from './components/RiskDetailModal';
 import { RiskFormModal } from './components/RiskFormModal';
 import { ActionTrackerModal } from './components/ActionTrackerModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { MasterRiskLevelModal } from './components/MasterRiskLevelModal';
+import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
 import { INITIAL_RISKS, INITIAL_KRIS } from './data/mockRisks';
 import { RiskItem, KRIItem } from './types/risk';
 import { calculateRiskLevel } from './utils/riskCalculations';
+import { User } from 'firebase/auth';
+import { initAuth, setAccessToken } from './services/googleAuth';
+import {
+  appendRiskToSpreadsheet,
+  syncAllRisksToSpreadsheet,
+  getSyncedRiskIds,
+} from './services/googleSheetsService';
 
 const STORAGE_KEY_RISKS = 'erm_dashboard_risks_v2';
-const STORAGE_KEY_KRIS = 'erm_dashboard_kris_v1';
+const STORAGE_KEY_KRIS = 'erm_dashboard_kris_v2';
 
 export default function App() {
   // Load initial state from LocalStorage or default empty list
@@ -32,6 +41,8 @@ export default function App() {
 
   const [kris, setKris] = useState<KRIItem[]>(() => {
     try {
+      // Clear legacy sample KRIs
+      localStorage.removeItem('erm_dashboard_kris_v1');
       const saved = localStorage.getItem(STORAGE_KEY_KRIS);
       if (saved) return JSON.parse(saved);
     } catch (e) {
@@ -60,6 +71,7 @@ export default function App() {
   // Filtering and Selection States
   const [selectedQuarter, setSelectedQuarter] = useState<string>('Q3 2026');
   const [selectedCell, setSelectedCell] = useState<{ likelihood: number; impact: number } | null>(null);
+  const [selectedSite, setSelectedSite] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedLevel, setSelectedLevel] = useState<string>('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
@@ -72,6 +84,14 @@ export default function App() {
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isActionTrackerOpen, setIsActionTrackerOpen] = useState<boolean>(false);
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState<boolean>(false);
+  const [isMasterLevelModalOpen, setIsMasterLevelModalOpen] = useState<boolean>(false);
+
+  // Google Sheets & Auth States
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState<boolean>(false);
+  const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
+  const [syncedRiskIds, setSyncedRiskIds] = useState<Set<string>>(() => getSyncedRiskIds());
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -79,6 +99,46 @@ export default function App() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Listen to Firebase Auth state on mount
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setCurrentUser(user);
+        setAccessTokenState(token);
+        setAccessToken(token);
+      },
+      () => {
+        setCurrentUser(null);
+        setAccessTokenState(null);
+        setAccessToken(null);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // One-click quick refresh & sync to Google Spreadsheet
+  const handleQuickRefreshSheets = async () => {
+    if (!accessToken) {
+      setIsGoogleSheetsModalOpen(true);
+      return;
+    }
+
+    setIsSyncingSheets(true);
+    try {
+      const res = await syncAllRisksToSpreadsheet(risks, accessToken);
+      setSyncedRiskIds(getSyncedRiskIds());
+      if (res.success) {
+        showToast(`Sinkronisasi berhasil! ${res.syncedCount} data risiko ter-update di Google Sheet.`);
+      } else {
+        showToast(res.message || 'Gagal menyinkronkan data ke Google Sheet.');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Terjadi kesalahan saat sinkronisasi Google Sheet.');
+    } finally {
+      setIsSyncingSheets(false);
+    }
   };
 
   // Filter risks by period if not "All"
@@ -125,8 +185,11 @@ export default function App() {
 
   const handleConfirmResetData = () => {
     localStorage.removeItem(STORAGE_KEY_RISKS);
+    localStorage.removeItem(STORAGE_KEY_KRIS);
     setRisks([]);
+    setKris([]);
     setSelectedCell(null);
+    setSelectedSite('');
     setSelectedCategory('');
     setSelectedLevel('');
     setSelectedDepartment('');
@@ -134,7 +197,7 @@ export default function App() {
     setSearchQuery('');
     if (viewingRisk) setViewingRisk(null);
     setIsResetConfirmModalOpen(false);
-    showToast('Seluruh daftar risiko berhasil dikosongkan.');
+    showToast('Seluruh daftar risiko & indikator KRI berhasil dikosongkan.');
   };
 
   const handleSaveRisk = (riskData: Omit<RiskItem, 'id'>, existingId?: string) => {
@@ -151,7 +214,25 @@ export default function App() {
         id: `rsk-${Date.now()}`,
       };
       setRisks((prev) => [newRisk, ...prev]);
-      showToast(`Risiko baru ${newRisk.code} berhasil didaftarkan ke Risk Register.`);
+
+      // Auto backup directly to Google Spreadsheet when user inputs
+      if (accessToken) {
+        appendRiskToSpreadsheet(newRisk, accessToken)
+          .then((res) => {
+            if (res && res.spreadsheetId) {
+              setSyncedRiskIds(getSyncedRiskIds());
+              showToast(`Risiko baru ${newRisk.code} tersimpan & otomatis di-backup ke Google Sheet!`);
+            } else {
+              showToast(`Risiko ${newRisk.code} tersimpan lokal. Klik Refresh Google Sheet untuk backup.`);
+            }
+          })
+          .catch((err) => {
+            console.warn('Auto backup to Google Sheets error:', err);
+            showToast(`Risiko ${newRisk.code} tersimpan lokal. Klik Refresh Google Sheet jika belum masuk.`);
+          });
+      } else {
+        showToast(`Risiko baru ${newRisk.code} berhasil didaftarkan. Hubungkan Google Sheet untuk auto-backup.`);
+      }
     }
     setIsFormOpen(false);
     setEditingRisk(null);
@@ -197,6 +278,7 @@ export default function App() {
 
   const handleClearFilters = () => {
     setSelectedCell(null);
+    setSelectedSite('');
     setSelectedCategory('');
     setSelectedLevel('');
     setSelectedDepartment('');
@@ -220,6 +302,7 @@ export default function App() {
       // CSV Export
       const headers = [
         'Kode',
+        'Site',
         'Judul Risiko',
         'Kategori',
         'Departemen',
@@ -228,6 +311,7 @@ export default function App() {
         'Dampak Inheren',
         'Skor Inheren',
         'Tingkat Inheren',
+        'Catatan Skenario Terburuk Inherent',
         'Pengendalian Eksisting',
         'Efektivitas Kontrol',
         'Rencana Mitigasi',
@@ -244,6 +328,7 @@ export default function App() {
 
       const rows = risks.map((r) => [
         `"${r.code}"`,
+        `"${r.site || ''}"`,
         `"${r.title.replace(/"/g, '""')}"`,
         `"${r.category}"`,
         `"${r.department}"`,
@@ -252,6 +337,7 @@ export default function App() {
         r.inherentImpact,
         r.inherentScore,
         `"${r.inherentLevel}"`,
+        `"${(r.inherentWorstCaseScenario || '').replace(/"/g, '""')}"`,
         `"${(r.existingControls || '').replace(/"/g, '""')}"`,
         `"${r.controlEffectiveness}"`,
         `"${(r.mitigationPlan || '').replace(/"/g, '""')}"`,
@@ -297,6 +383,12 @@ export default function App() {
       <Navbar
         onOpenAddModal={handleOpenAdd}
         onOpenActionTracker={() => setIsActionTrackerOpen(true)}
+        onOpenMasterRiskLevel={() => setIsMasterLevelModalOpen(true)}
+        onOpenGoogleSheetsSync={() => setIsGoogleSheetsModalOpen(true)}
+        onQuickRefreshSheets={handleQuickRefreshSheets}
+        isGoogleSheetsConnected={Boolean(currentUser && accessToken)}
+        pendingSyncCount={risks.filter((r) => !syncedRiskIds.has(r.id)).length}
+        isSyncingSheets={isSyncingSheets}
         onExportData={handleExportData}
         onResetData={handleOpenResetModal}
         selectedQuarter={selectedQuarter}
@@ -356,6 +448,12 @@ export default function App() {
             onDeleteMultipleRisks={handleDeleteMultipleRisks}
             onClearAllRisks={handleOpenResetModal}
             onOpenAddRisk={handleOpenAdd}
+            syncedRiskIds={syncedRiskIds}
+            onOpenGoogleSheetsSync={() => setIsGoogleSheetsModalOpen(true)}
+            onQuickRefreshSheets={handleQuickRefreshSheets}
+            isSyncingSheets={isSyncingSheets}
+            selectedSite={selectedSite}
+            onSelectSite={setSelectedSite}
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             selectedLevel={selectedLevel}
@@ -426,6 +524,39 @@ export default function App() {
           count: risks.length,
         }}
         confirmButtonText="Kosongkan Semua Risiko"
+      />
+
+      {/* Global Master Risk Level Reference Table Modal */}
+      <MasterRiskLevelModal
+        isOpen={isMasterLevelModalOpen}
+        onClose={() => setIsMasterLevelModalOpen(false)}
+      />
+
+      {/* Google Sheets Backup & Synchronization Modal */}
+      <GoogleSheetsSyncModal
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => setIsGoogleSheetsModalOpen(false)}
+        currentUser={currentUser}
+        accessToken={accessToken}
+        onAuthSuccess={(user, token) => {
+          setCurrentUser(user);
+          setAccessTokenState(token);
+          setAccessToken(token);
+          showToast(`Akun Google ${user.displayName || user.email} berhasil terhubung.`);
+        }}
+        onAuthLogout={() => {
+          setCurrentUser(null);
+          setAccessTokenState(null);
+          setAccessToken(null);
+          showToast('Koneksi Google Sheets diputuskan.');
+        }}
+        risks={risks}
+        onSyncComplete={(res) => {
+          setSyncedRiskIds(getSyncedRiskIds());
+          if (res.success) {
+            showToast(res.message);
+          }
+        }}
       />
     </div>
   );

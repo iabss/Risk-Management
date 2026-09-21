@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PieChart, BarChart3, ShieldAlert, ArrowDownRight } from 'lucide-react';
-import { RiskItem, RiskCategory } from '../types/risk';
+import { RiskItem, RiskCategory, RISK_CATEGORIES } from '../types/risk';
 
 interface RiskChartsProps {
   risks: RiskItem[];
@@ -8,22 +8,12 @@ interface RiskChartsProps {
   selectedCategory: string;
 }
 
-const CATEGORIES: RiskCategory[] = [
-  'Operasional',
-  'Keuangan',
-  'Kepatuhan & Regulasi',
-  'Keamanan Siber & IT',
-  'K3 & Lingkungan',
-  'Strategis & Reputasi',
-];
-
 const CATEGORY_COLORS: Record<RiskCategory, string> = {
-  'Operasional': '#3b82f6', // blue
-  'Keuangan': '#10b981', // emerald
-  'Kepatuhan & Regulasi': '#8b5cf6', // purple
-  'Keamanan Siber & IT': '#f43f5e', // rose
-  'K3 & Lingkungan': '#f59e0b', // amber
-  'Strategis & Reputasi': '#06b6d4', // cyan
+  'Operational': '#3b82f6', // blue
+  'Financial': '#10b981', // emerald
+  'Legal & Regulation': '#8b5cf6', // purple
+  'Entity Company': '#06b6d4', // cyan
+  'Human Resources': '#f59e0b', // amber
 };
 
 export const RiskCharts: React.FC<RiskChartsProps> = ({
@@ -33,15 +23,18 @@ export const RiskCharts: React.FC<RiskChartsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'category' | 'reduction' | 'status'>('category');
 
+  // Dynamic list of categories from both constants and any existing risks
+  const allCategories = Array.from(new Set([...RISK_CATEGORIES, ...risks.map((r) => r.category)]));
+
   // Category counts
-  const categoryData = CATEGORIES.map((cat) => {
+  const categoryData = allCategories.map((cat) => {
     const count = risks.filter((r) => r.category === cat).length;
     const criticalCount = risks.filter((r) => r.category === cat && r.inherentLevel === 'Critical').length;
     return {
       category: cat,
       count,
       criticalCount,
-      color: CATEGORY_COLORS[cat],
+      color: (CATEGORY_COLORS as Record<string, string>)[cat] || '#ec4899',
     };
   }).filter((d) => d.count > 0);
 

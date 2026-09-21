@@ -7,11 +7,20 @@ import {
   RotateCcw,
   Building2,
   Calendar,
+  Table,
+  FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NavbarProps {
   onOpenAddModal: () => void;
   onOpenActionTracker: () => void;
+  onOpenMasterRiskLevel?: () => void;
+  onOpenGoogleSheetsSync?: () => void;
+  onQuickRefreshSheets?: () => void;
+  isGoogleSheetsConnected?: boolean;
+  pendingSyncCount?: number;
+  isSyncingSheets?: boolean;
   onExportData: (format: 'csv' | 'json') => void;
   onResetData: () => void;
   selectedQuarter: string;
@@ -23,6 +32,12 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenAddModal,
   onOpenActionTracker,
+  onOpenMasterRiskLevel,
+  onOpenGoogleSheetsSync,
+  onQuickRefreshSheets,
+  isGoogleSheetsConnected = false,
+  pendingSyncCount = 0,
+  isSyncingSheets = false,
   onExportData,
   onResetData,
   selectedQuarter,
@@ -74,6 +89,61 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <option value="Q1 2026" className="bg-[#16161A] text-white">Q1 2026</option>
               </select>
             </div>
+
+            {/* Google Sheets Live Backup & Sync Button */}
+            {onOpenGoogleSheetsSync && (
+              <div className="flex items-center space-x-1">
+                <button
+                  id="btn-google-sheets-sync"
+                  onClick={onOpenGoogleSheetsSync}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-sm text-xs font-medium border transition ${
+                    isGoogleSheetsConnected
+                      ? pendingSyncCount > 0
+                        ? 'bg-amber-950/40 text-amber-300 hover:text-white border-amber-800/60 hover:bg-amber-900/60'
+                        : 'bg-emerald-950/40 text-emerald-300 hover:text-white border-emerald-800/60 hover:bg-emerald-900/60'
+                      : 'bg-[#16161A] text-white/70 hover:text-white border-white/10 hover:border-emerald-600/50'
+                  }`}
+                  title="Integrasi Backup Google Spreadsheet"
+                >
+                  <FileSpreadsheet className={`w-3.5 h-3.5 ${isGoogleSheetsConnected ? (pendingSyncCount > 0 ? 'text-amber-400' : 'text-emerald-400') : 'text-white/60'}`} />
+                  <span className="hidden lg:inline">
+                    {isGoogleSheetsConnected
+                      ? pendingSyncCount > 0
+                        ? `Sheets (${pendingSyncCount} Pending)`
+                        : 'Sheets Backup'
+                      : 'Google Sheets'}
+                  </span>
+                  {isGoogleSheetsConnected && pendingSyncCount > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                  )}
+                </button>
+
+                {isGoogleSheetsConnected && onQuickRefreshSheets && (
+                  <button
+                    id="btn-quick-refresh-sheets"
+                    onClick={onQuickRefreshSheets}
+                    disabled={isSyncingSheets}
+                    className="p-1.5 rounded-sm text-emerald-400 hover:text-white bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/60 transition disabled:opacity-50"
+                    title="Refresh & Sinkronkan Semua Risiko ke Google Sheet"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Master Risk Level Matrix Reference Button */}
+            {onOpenMasterRiskLevel && (
+              <button
+                id="btn-master-risk-level"
+                onClick={onOpenMasterRiskLevel}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-sm text-xs font-medium bg-[#16161A] hover:bg-[#1F1F24] text-blue-300 hover:text-white border border-blue-900/40 hover:border-blue-700 transition"
+                title="Tabel Standar Kriteria Master Risk Level"
+              >
+                <Table className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden lg:inline">Master Risk Level</span>
+              </button>
+            )}
 
             {/* Action Items tracker button */}
             <button

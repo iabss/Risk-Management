@@ -16,6 +16,9 @@ import {
   Trash2,
   AlertTriangle,
   Layers,
+  MapPin,
+  FileText,
+  Table,
 } from 'lucide-react';
 import { RiskItem, ActionItem } from '../types/risk';
 import {
@@ -24,6 +27,8 @@ import {
   getRiskLevelConfig,
   getStatusConfig,
 } from '../utils/riskCalculations';
+import { getMasterRiskLevelRow } from '../data/masterRiskLevel';
+import { MasterRiskLevelModal } from './MasterRiskLevelModal';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface RiskDetailModalProps {
@@ -42,12 +47,15 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
   onToggleActionItem,
 }) => {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isMasterMatrixOpen, setIsMasterMatrixOpen] = useState(false);
 
   if (!risk) return null;
 
   const inherentCfg = getRiskLevelConfig(risk.inherentLevel);
   const residualCfg = getRiskLevelConfig(risk.residualLevel);
   const statusCfg = getStatusConfig(risk.status);
+  const inherentMasterRow = getMasterRiskLevelRow(risk.inherentImpact);
+  const residualMasterRow = getMasterRiskLevelRow(risk.residualImpact);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
@@ -62,6 +70,10 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-sm bg-white/5 text-white/80 border border-white/10">
                   {risk.code}
+                </span>
+                <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-sm text-red-300 bg-red-950/40 border border-red-800/40 flex items-center">
+                  <MapPin className="w-2.5 h-2.5 mr-1" />
+                  {risk.site || 'MHU'}
                 </span>
                 <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-sm text-white/50 bg-white/5 border border-white/5">
                   {risk.category}
@@ -107,7 +119,16 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
           {/* Metadata chips */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-[#0F0F12] p-3.5 rounded-sm border border-white/5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-[#0F0F12] p-3.5 rounded-sm border border-white/5">
+            <div>
+              <span className="text-white/40 block text-[9px] uppercase font-mono tracking-wider">
+                Lokasi / Site
+              </span>
+              <span className="font-medium text-white flex items-center mt-1">
+                <MapPin className="w-3.5 h-3.5 mr-1.5 text-red-400" />
+                {risk.site || 'MHU'}
+              </span>
+            </div>
             <div>
               <span className="text-white/40 block text-[9px] uppercase font-mono tracking-wider">
                 Departemen
@@ -119,7 +140,7 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
             </div>
             <div>
               <span className="text-white/40 block text-[9px] uppercase font-mono tracking-wider">
-                Pemilik Risiko (Owner)
+                Pemilik (Owner)
               </span>
               <span className="font-medium text-white flex items-center mt-1">
                 <User className="w-3.5 h-3.5 mr-1.5 text-white/40" />
@@ -137,7 +158,7 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
             </div>
             <div>
               <span className="text-white/40 block text-[9px] uppercase font-mono tracking-wider">
-                Kecepatan Risiko (Velocity)
+                Kecepatan (Velocity)
               </span>
               <span className="font-medium text-amber-400 flex items-center mt-1">
                 <Zap className="w-3.5 h-3.5 mr-1 text-amber-400" />
@@ -153,32 +174,47 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
           {/* Dual Score Comparison Box (Inherent vs Residual) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Inherent Risk Card */}
-            <div className={`p-4 rounded-sm border ${inherentCfg.badgeBg}`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">
-                  Risiko Inheren (Awal)
-                </span>
-                <span className="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-sm bg-black/40 border border-white/10">
-                  {inherentCfg.idLabel}
-                </span>
-              </div>
-              <div className="mt-3 flex items-baseline space-x-2">
-                <span className="text-3xl font-serif">
-                  {risk.inherentScore}
-                </span>
-                <span className="text-xs font-mono opacity-60">
-                  (L: {risk.inherentLikelihood} × I: {risk.inherentImpact})
-                </span>
-              </div>
-              <div className="mt-2 text-[11px] space-y-1 opacity-80">
-                <div>
-                  Kemungkinan:{' '}
-                  <b className="text-white">{LIKELIHOOD_LABELS[risk.inherentLikelihood]?.title}</b>
+            <div className={`p-4 rounded-sm border ${inherentCfg.badgeBg} flex flex-col justify-between`}>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono uppercase tracking-widest font-semibold">
+                    Risiko Inheren (Awal)
+                  </span>
+                  <span className="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-sm bg-black/40 border border-white/10">
+                    {inherentCfg.idLabel}
+                  </span>
                 </div>
-                <div>
-                  Dampak: <b className="text-white">{IMPACT_LABELS[risk.inherentImpact]?.title}</b>
+                <div className="mt-3 flex items-baseline space-x-2">
+                  <span className="text-3xl font-serif">
+                    {risk.inherentScore}
+                  </span>
+                  <span className="text-xs font-mono opacity-60">
+                    (L: {risk.inherentLikelihood} × I: {risk.inherentImpact})
+                  </span>
+                </div>
+                <div className="mt-2 text-[11px] space-y-1 opacity-80">
+                  <div>
+                    Kemungkinan:{' '}
+                    <b className="text-white">{LIKELIHOOD_LABELS[risk.inherentLikelihood]?.title}</b>
+                  </div>
+                  <div>
+                    Dampak: <b className="text-white">{IMPACT_LABELS[risk.inherentImpact]?.title}</b>
+                  </div>
                 </div>
               </div>
+
+              {/* Catatan / Skenario Terburuk Inherent */}
+              {risk.inherentWorstCaseScenario && (
+                <div className="mt-3 pt-2.5 border-t border-white/10 text-[11px]">
+                  <span className="text-white/50 block text-[9px] uppercase font-mono tracking-wider mb-1 flex items-center">
+                    <FileText className="w-2.5 h-2.5 mr-1 text-red-400" />
+                    Catatan / Skenario Terburuk Inherent
+                  </span>
+                  <p className="text-white/90 bg-black/30 p-2.5 rounded-xs border border-white/5 leading-relaxed">
+                    {risk.inherentWorstCaseScenario}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Residual Risk Card */}
@@ -210,6 +246,48 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Master Risk Level Criteria Justification */}
+          {inherentMasterRow && (
+            <div className="p-3.5 rounded-sm bg-[#0F0F12] border border-blue-900/40 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-blue-400 flex items-center">
+                  <Table className="w-3.5 h-3.5 mr-1.5" />
+                  Kriteria Master Risk Level (Impact Inheren Level {risk.inherentImpact} - {inherentMasterRow.levelNameEn})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsMasterMatrixOpen(true)}
+                  className="text-[10px] font-mono text-blue-300 hover:text-white underline transition cursor-pointer"
+                >
+                  Buka Tabel Lengkap 5x5
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1 text-[11px] text-white/70">
+                <div className="bg-[#141418] p-2 rounded-xs border border-white/5">
+                  <span className="text-white/40 block text-[9px] uppercase font-mono mb-1">Entity Wide:</span>
+                  <p className="text-white/90">• {inherentMasterRow.entityWide.join('; ')}</p>
+                </div>
+                <div className="bg-[#141418] p-2 rounded-xs border border-white/5">
+                  <span className="text-white/40 block text-[9px] uppercase font-mono mb-1">Output (Operasional):</span>
+                  <p className="text-white/90">• {inherentMasterRow.output.join('; ')}</p>
+                </div>
+                <div className="bg-[#141418] p-2 rounded-xs border border-white/5">
+                  <span className="text-white/40 block text-[9px] uppercase font-mono mb-1">Human Resources:</span>
+                  <p className="text-white/90">• {inherentMasterRow.humanResources.join('; ')}</p>
+                </div>
+                <div className="bg-[#141418] p-2 rounded-xs border border-white/5">
+                  <span className="text-white/40 block text-[9px] uppercase font-mono mb-1">Legal & Regulatory:</span>
+                  <p className="text-white/90">• {inherentMasterRow.legalRegulatory.join('; ')}</p>
+                </div>
+                <div className="bg-[#141418] p-2 rounded-xs border border-white/5 sm:col-span-2 md:col-span-2">
+                  <span className="text-white/40 block text-[9px] uppercase font-mono mb-1">Financial:</span>
+                  <p className="text-white/90">• {inherentMasterRow.financial.join('; ')}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Description & Root Cause & Consequences */}
           <div className="space-y-4 text-xs">
@@ -364,6 +442,13 @@ export const RiskDetailModal: React.FC<RiskDetailModalProps> = ({
           department: risk.department,
         }}
         confirmButtonText="Ya, Hapus Profil Risiko"
+      />
+
+      {/* Master Risk Level Table Modal */}
+      <MasterRiskLevelModal
+        isOpen={isMasterMatrixOpen}
+        onClose={() => setIsMasterMatrixOpen(false)}
+        currentSelectedLevel={risk.inherentImpact}
       />
     </div>
   );

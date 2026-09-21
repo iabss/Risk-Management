@@ -6,11 +6,20 @@ import {
   AlertCircle,
   Save,
   HelpCircle,
+  MapPin,
+  Building2,
+  DollarSign,
+  Table,
 } from 'lucide-react';
 import {
   RiskItem,
+  SiteOption,
+  SITE_OPTIONS,
   RiskCategory,
+  RISK_CATEGORIES,
   Department,
+  DEPARTMENTS,
+  FINANCIAL_IMPACT_RANGES,
   RiskStatus,
   ControlEffectiveness,
   ActionItem,
@@ -21,6 +30,8 @@ import {
   LIKELIHOOD_LABELS,
   IMPACT_LABELS,
 } from '../utils/riskCalculations';
+import { ImpactCriteriaPicker } from './ImpactCriteriaPicker';
+import { MasterRiskLevelModal } from './MasterRiskLevelModal';
 
 interface RiskFormModalProps {
   isOpen: boolean;
@@ -30,26 +41,6 @@ interface RiskFormModalProps {
   nextCodeNumber: number;
 }
 
-const CATEGORIES: RiskCategory[] = [
-  'Operasional',
-  'Keuangan',
-  'Kepatuhan & Regulasi',
-  'Keamanan Siber & IT',
-  'K3 & Lingkungan',
-  'Strategis & Reputasi',
-];
-
-const DEPARTMENTS: Department[] = [
-  'Operasional',
-  'Finance & Accounting',
-  'Legal & Compliance',
-  'IT & Security',
-  'HSE & Safety',
-  'Human Capital',
-  'Supply Chain',
-  'Direksi & Eksekutif',
-];
-
 export const RiskFormModal: React.FC<RiskFormModalProps> = ({
   isOpen,
   onClose,
@@ -57,23 +48,23 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
   editingRisk,
   nextCodeNumber,
 }) => {
-  if (!isOpen) return null;
-
   // Form State
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [rootCause, setRootCause] = useState('');
   const [consequences, setConsequences] = useState('');
-  const [category, setCategory] = useState<RiskCategory>('Operasional');
-  const [department, setDepartment] = useState<Department>('Operasional');
+  const [site, setSite] = useState<SiteOption>('MHU');
+  const [category, setCategory] = useState<RiskCategory>('Operational');
+  const [department, setDepartment] = useState<Department>('Supply Management');
   const [owner, setOwner] = useState('');
-  const [financialImpactEstimate, setFinancialImpactEstimate] = useState('Rp 500 Juta');
+  const [financialImpactEstimate, setFinancialImpactEstimate] = useState<string>('1 - 50 Juta');
   const [velocity, setVelocity] = useState<'Rapid' | 'Moderate' | 'Slow'>('Moderate');
 
   // Inherent Risk
   const [inherentLikelihood, setInherentLikelihood] = useState<number>(3);
   const [inherentImpact, setInherentImpact] = useState<number>(3);
+  const [inherentWorstCaseScenario, setInherentWorstCaseScenario] = useState<string>('');
 
   // Controls & Mitigation
   const [existingControls, setExistingControls] = useState('');
@@ -93,6 +84,10 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
   const [newActionAssignee, setNewActionAssignee] = useState('');
   const [newActionDueDate, setNewActionDueDate] = useState('');
 
+  // Master Risk Level Matrix Modal State
+  const [isFullMatrixModalOpen, setIsFullMatrixModalOpen] = useState(false);
+  const [matrixTarget, setMatrixTarget] = useState<'inherent' | 'residual'>('inherent');
+
   // Prepopulate when editing
   useEffect(() => {
     if (editingRisk) {
@@ -101,13 +96,15 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       setDescription(editingRisk.description);
       setRootCause(editingRisk.rootCause || '');
       setConsequences(editingRisk.consequences || '');
-      setCategory(editingRisk.category);
-      setDepartment(editingRisk.department);
+      setSite(editingRisk.site || 'MHU');
+      setCategory(editingRisk.category || 'Operational');
+      setDepartment(editingRisk.department || 'Supply Management');
       setOwner(editingRisk.owner);
-      setFinancialImpactEstimate(editingRisk.financialImpactEstimate || 'Rp 500 Juta');
+      setFinancialImpactEstimate(editingRisk.financialImpactEstimate || '1 - 50 Juta');
       setVelocity(editingRisk.velocity || 'Moderate');
       setInherentLikelihood(editingRisk.inherentLikelihood);
       setInherentImpact(editingRisk.inherentImpact);
+      setInherentWorstCaseScenario(editingRisk.inherentWorstCaseScenario || '');
       setExistingControls(editingRisk.existingControls);
       setControlEffectiveness(editingRisk.controlEffectiveness);
       setMitigationPlan(editingRisk.mitigationPlan);
@@ -124,13 +121,15 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       setDescription('');
       setRootCause('');
       setConsequences('');
-      setCategory('Operasional');
-      setDepartment('Operasional');
+      setSite('MHU');
+      setCategory('Operational');
+      setDepartment('Supply Management');
       setOwner('');
-      setFinancialImpactEstimate('Rp 500 Juta');
+      setFinancialImpactEstimate('1 - 50 Juta');
       setVelocity('Moderate');
       setInherentLikelihood(3);
       setInherentImpact(3);
+      setInherentWorstCaseScenario('');
       setExistingControls('');
       setControlEffectiveness('Adequate');
       setMitigationPlan('');
@@ -141,7 +140,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       setTargetDate('2026-12-31');
       setActionItems([]);
     }
-  }, [editingRisk, nextCodeNumber]);
+  }, [editingRisk, nextCodeNumber, isOpen]);
 
   // Derived scores
   const inherentScore = inherentLikelihood * inherentImpact;
@@ -185,6 +184,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       description: description.trim(),
       rootCause: rootCause.trim(),
       consequences: consequences.trim(),
+      site,
       category,
       department,
       owner: owner.trim() || 'Tim Manajemen Risiko',
@@ -192,6 +192,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       inherentImpact,
       inherentScore,
       inherentLevel,
+      inherentWorstCaseScenario: inherentWorstCaseScenario.trim(),
       existingControls: existingControls.trim() || 'Standard Operating Procedure (SOP) divisi.',
       controlEffectiveness,
       mitigationPlan: mitigationPlan.trim() || 'Rencana perbaikan dan monitoring berkala.',
@@ -202,7 +203,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
       residualLevel,
       riskAppetiteStatus: residualScore <= 9 ? 'Within Appetite' : 'At Limit',
       status,
-      financialImpactEstimate: financialImpactEstimate || 'Rp 500 Juta',
+      financialImpactEstimate: financialImpactEstimate || '1 - 50 Juta',
       velocity,
       lastReviewDate: new Date().toISOString().split('T')[0],
       targetDate: targetDate || '2026-12-31',
@@ -212,6 +213,8 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
 
     onSave(payload, editingRisk?.id);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
@@ -239,10 +242,10 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
           {/* Section 1: Basic Identifiers */}
           <div className="space-y-4">
             <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 border-b border-white/5 pb-1">
-              1. Identitas & Kepemilikan Risiko
+              1. Identitas, Lokasi & Kepemilikan Risiko
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-medium text-white/80 mb-1">
                   Kode Risiko
@@ -256,6 +259,30 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 />
               </div>
 
+              {/* Pilihan Site */}
+              <div>
+                <label className="block text-xs font-medium text-white/80 mb-1 flex items-center justify-between">
+                  <span className="flex items-center">
+                    <MapPin className="w-3 h-3 mr-1 text-red-400" />
+                    Pilihan Site
+                  </span>
+                  <span className="text-[10px] text-red-400 font-mono">*Wajib</span>
+                </label>
+                <select
+                  value={site}
+                  onChange={(e) => setSite(e.target.value as SiteOption)}
+                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white font-medium focus:outline-none focus:border-white/30 cursor-pointer"
+                  required
+                >
+                  {SITE_OPTIONS.map((s) => (
+                    <option key={s} value={s} className="bg-[#16161A] text-white">
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Kategori Risiko */}
               <div>
                 <label className="block text-xs font-medium text-white/80 mb-1">
                   Kategori Risiko
@@ -263,9 +290,9 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as RiskCategory)}
-                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white focus:outline-none focus:border-white/30"
+                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white focus:outline-none focus:border-white/30 cursor-pointer"
                 >
-                  {CATEGORIES.map((c) => (
+                  {RISK_CATEGORIES.map((c) => (
                     <option key={c} value={c} className="bg-[#16161A] text-white">
                       {c}
                     </option>
@@ -273,6 +300,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 </select>
               </div>
 
+              {/* Departemen Penanggung Jawab */}
               <div>
                 <label className="block text-xs font-medium text-white/80 mb-1">
                   Departemen Penanggung Jawab
@@ -280,7 +308,7 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 <select
                   value={department}
                   onChange={(e) => setDepartment(e.target.value as Department)}
-                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white focus:outline-none focus:border-white/30"
+                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white focus:outline-none focus:border-white/30 cursor-pointer"
                 >
                   {DEPARTMENTS.map((d) => (
                     <option key={d} value={d} className="bg-[#16161A] text-white">
@@ -320,17 +348,22 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 />
               </div>
 
+              {/* Estimasi Dampak Finansial Range */}
               <div>
                 <label className="block text-xs font-medium text-white/80 mb-1">
                   Estimasi Dampak Finansial
                 </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Rp 2.5 Milyar"
+                <select
                   value={financialImpactEstimate}
                   onChange={(e) => setFinancialImpactEstimate(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
-                />
+                  className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white focus:outline-none focus:border-white/30 cursor-pointer font-mono"
+                >
+                  {FINANCIAL_IMPACT_RANGES.map((rng) => (
+                    <option key={rng} value={rng} className="bg-[#16161A] text-white">
+                      {rng}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -403,6 +436,20 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
               </div>
             </div>
 
+            {/* Pilihan Kriteria Sebelum Penetapan Impact */}
+            <ImpactCriteriaPicker
+              currentImpact={inherentImpact}
+              onSelectImpact={(level) => setInherentImpact(level)}
+              onOpenFullMatrixModal={() => {
+                setMatrixTarget('inherent');
+                setIsFullMatrixModalOpen(true);
+              }}
+              onApplyDescription={(text) => {
+                setInherentWorstCaseScenario((prev) => (prev ? `${prev}\n• ${text}` : `• ${text}`));
+              }}
+              titlePrefix="Inheren"
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Likelihood 1-5 */}
               <div className="p-3.5 bg-[#0F0F12] rounded-sm border border-white/5">
@@ -451,6 +498,21 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                   {IMPACT_LABELS[inherentImpact]?.title}: {IMPACT_LABELS[inherentImpact]?.desc}
                 </p>
               </div>
+            </div>
+
+            {/* Kolom Catatan / Skenario Terburuk Inherent */}
+            <div>
+              <label className="block text-xs font-medium text-white/80 mb-1 flex items-center justify-between">
+                <span>Catatan / Skenario Terburuk Inherent</span>
+                <span className="text-[10px] text-red-400/70 font-mono">Sebelum Kontrol & Mitigasi Diterapkan</span>
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Deskripsikan proyeksi skenario terburuk (worst-case scenario) jika risiko ini terjadi secara penuh tanpa adanya proteksi/pengendalian..."
+                value={inherentWorstCaseScenario}
+                onChange={(e) => setInherentWorstCaseScenario(e.target.value)}
+                className="w-full text-xs px-3 py-2 bg-[#0F0F12] border border-white/10 rounded-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+              />
             </div>
           </div>
 
@@ -563,6 +625,18 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
                 Skor Residual: {residualScore} ({residualCfg.idLabel})
               </div>
             </div>
+
+            {/* Pilihan Kriteria Sebelum Penetapan Residual Impact */}
+            <ImpactCriteriaPicker
+              currentImpact={residualImpact}
+              onSelectImpact={(level) => setResidualImpact(level)}
+              onOpenFullMatrixModal={() => {
+                setMatrixTarget('residual');
+                setIsFullMatrixModalOpen(true);
+              }}
+              titlePrefix="Residual"
+              isResidual={true}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Residual Likelihood 1-5 */}
@@ -692,6 +766,20 @@ export const RiskFormModal: React.FC<RiskFormModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Master Risk Level Table Modal */}
+      <MasterRiskLevelModal
+        isOpen={isFullMatrixModalOpen}
+        onClose={() => setIsFullMatrixModalOpen(false)}
+        currentSelectedLevel={matrixTarget === 'inherent' ? inherentImpact : residualImpact}
+        onSelectLevel={(level) => {
+          if (matrixTarget === 'inherent') {
+            setInherentImpact(level);
+          } else {
+            setResidualImpact(level);
+          }
+        }}
+      />
     </div>
   );
 };

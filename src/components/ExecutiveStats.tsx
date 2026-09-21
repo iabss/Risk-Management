@@ -169,15 +169,21 @@ export const ExecutiveStats: React.FC<ExecutiveStatsProps> = ({
           <p className="text-3xl font-serif text-white">
             {actionCompletionRate}%
           </p>
-          <span
-            className={`px-2 py-0.5 text-[9px] uppercase tracking-widest font-mono rounded-sm border ${
-              kriWarningOrCritical > 0
-                ? 'bg-amber-950/40 text-amber-400 border-amber-900/50'
-                : 'bg-emerald-950/40 text-emerald-400 border-emerald-900/50'
-            }`}
-          >
-            {kriWarningOrCritical} Waspada
-          </span>
+          {kris.length > 0 ? (
+            <span
+              className={`px-2 py-0.5 text-[9px] uppercase tracking-widest font-mono rounded-sm border ${
+                kriWarningOrCritical > 0
+                  ? 'bg-amber-950/40 text-amber-400 border-amber-900/50'
+                  : 'bg-emerald-950/40 text-emerald-400 border-emerald-900/50'
+              }`}
+            >
+              {kriWarningOrCritical} Waspada
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 text-[9px] uppercase tracking-widest font-mono rounded-sm border bg-white/5 text-white/40 border-white/10">
+              0 Waspada
+            </span>
+          )}
         </div>
         <div className="mt-3 flex items-center justify-between text-[10px] text-white/40">
           <span>{completedActions}/{totalActions} mitigasi selesai</span>

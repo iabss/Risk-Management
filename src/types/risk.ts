@@ -1,22 +1,79 @@
 export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
 
+export type SiteOption = 'MHU' | 'CDI' | 'MBL' | 'HAULING (MSJ, TD)';
+
+export const SITE_OPTIONS: SiteOption[] = [
+  'MHU',
+  'CDI',
+  'MBL',
+  'HAULING (MSJ, TD)',
+];
+
 export type RiskCategory =
-  | 'Operasional'
-  | 'Keuangan'
-  | 'Kepatuhan & Regulasi'
-  | 'Keamanan Siber & IT'
-  | 'K3 & Lingkungan'
-  | 'Strategis & Reputasi';
+  | 'Operational'
+  | 'Financial'
+  | 'Legal & Regulation'
+  | 'Entity Company'
+  | 'Human Resources';
+
+export const RISK_CATEGORIES: RiskCategory[] = [
+  'Operational',
+  'Financial',
+  'Legal & Regulation',
+  'Entity Company',
+  'Human Resources',
+];
 
 export type Department =
-  | 'Operasional'
-  | 'Finance & Accounting'
-  | 'Legal & Compliance'
-  | 'IT & Security'
-  | 'HSE & Safety'
+  | 'Supply Management'
+  | 'Logistic'
+  | 'Engineering'
+  | 'Business Development'
+  | 'Legal'
+  | 'Production'
+  | 'Corporate Planning Management Development'
+  | 'Information Technology'
+  | 'Plant'
+  | 'Health, Safety, Environment'
+  | 'General Service'
+  | 'Civil Project Management'
   | 'Human Capital'
-  | 'Supply Chain'
-  | 'Direksi & Eksekutif';
+  | 'Accounting & Tax'
+  | 'Finance'
+  | 'Internal Audit Risk Management'
+  | 'FKAP'
+  | 'CSR';
+
+export const DEPARTMENTS: Department[] = [
+  'Supply Management',
+  'Logistic',
+  'Engineering',
+  'Business Development',
+  'Legal',
+  'Production',
+  'Corporate Planning Management Development',
+  'Information Technology',
+  'Plant',
+  'Health, Safety, Environment',
+  'General Service',
+  'Civil Project Management',
+  'Human Capital',
+  'Accounting & Tax',
+  'Finance',
+  'Internal Audit Risk Management',
+  'FKAP',
+  'CSR',
+];
+
+export const FINANCIAL_IMPACT_RANGES = [
+  '1 - 50 Juta',
+  '51 - 100 Juta',
+  '101 - 500 Juta',
+  '501 - 1 M',
+  '> 1 M',
+] as const;
+
+export type FinancialImpactRange = (typeof FINANCIAL_IMPACT_RANGES)[number];
 
 export type RiskStatus = 'Open' | 'Mitigating' | 'Monitored' | 'Closed';
 
@@ -38,6 +95,7 @@ export interface RiskItem {
   description: string;
   rootCause: string;
   consequences: string;
+  site: SiteOption;
   category: RiskCategory;
   department: Department;
   owner: string;
@@ -46,6 +104,7 @@ export interface RiskItem {
   inherentImpact: number; // 1-5
   inherentScore: number; // 1-25
   inherentLevel: RiskLevel;
+  inherentWorstCaseScenario?: string; // Catatan / Skenario Terburuk Inherent
   // Kontrol & Mitigasi
   existingControls: string;
   controlEffectiveness: ControlEffectiveness;
@@ -59,7 +118,7 @@ export interface RiskItem {
   // Governance & Metadata
   riskAppetiteStatus: 'Within Appetite' | 'At Limit' | 'Breached';
   status: RiskStatus;
-  financialImpactEstimate: string; // e.g. "Rp 1.5 Milyar"
+  financialImpactEstimate: string; // e.g. "1 - 50 Juta", "51 - 100 Juta", etc.
   velocity: 'Rapid' | 'Moderate' | 'Slow';
   lastReviewDate: string;
   targetDate: string;
@@ -86,6 +145,7 @@ export interface KRIItem {
 
 export interface RiskFilterState {
   search: string;
+  site?: string;
   category: string;
   department: string;
   level: string;
